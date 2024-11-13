@@ -1,0 +1,267 @@
+#define STB_IMAGE_IMPLEMENTATION
+
+#include "stb_image.h"
+
+#include <windows.h>
+
+#include <stdio.h>
+
+#include <stdlib.h>
+
+ 
+
+// 전역 변수
+
+int width1, height1, channels1;
+
+int width2, height2, channels2;
+
+unsigned char* image_data1;
+
+unsigned char* image_data2;
+
+ 
+
+// 윈도우 프로시저 함수
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+
+ 
+
+// BGR을 RGB로 변환하는 함수
+
+unsigned char* convertBGRtoRGB(unsigned char* data, int width, int height) {
+
+    int newSize = width * height * 3;
+
+    unsigned char* rgbData = (unsigned char*)malloc(newSize);
+
+    for (int i = 0, j = 0; i < width * height * 3; i += 3, j += 3) {
+
+        rgbData[j] = data[i + 2];   // B -> R
+
+        rgbData[j + 1] = data[i + 1]; // G -> G
+
+        rgbData[j + 2] = data[i];     // R -> B
+
+    }
+
+    return rgbData;
+
+}
+
+ 
+
+int main() {
+
+    // 이미지 파일 경로 (절대 경로로 수정)
+
+    const char* image_path1 = "D:\\rpng\\Project5\\jcshim.jpg";  // 첫 번째 이미지 경로 (JPG)
+
+    const char* image_path2 = "D:\\rpng\\Project5\\jcshim (1).png";  // 두 번째 이미지 경로 (PNG)
+
+ 
+
+    // 첫 번째 이미지 로드
+
+    image_data1 = stbi_load(image_path1, &width1, &height1, &channels1, 0);
+
+    if (!image_data1) {
+
+        MessageBoxW(NULL, L"첫 번째 이미지 로드 실패!", L"Error", MB_OK);
+
+        return -1;
+
+    }
+
+ 
+
+    // 두 번째 이미지 로드
+
+    image_data2 = stbi_load(image_path2, &width2, &height2, &channels2, 0);
+
+    if (!image_data2) {
+
+        MessageBoxW(NULL, L"두 번째 이미지 로드 실패!", L"Error", MB_OK);
+
+        stbi_image_free(image_data1);
+
+        return -1;
+
+    }
+
+ 
+
+    // BGR -> RGB 변환 (필요한 경우)
+
+    if (channels1 == 3) { // BGR 이미지일 경우
+
+        image_data1 = convertBGRtoRGB(image_data1, width1, height1);
+
+        channels1 = 3; // RGB로 변환 후 채널은 3으로 설정
+
+    }
+
+ 
+
+    if (channels2 == 3) { // BGR 이미지일 경우
+
+        image_data2 = convertBGRtoRGB(image_data2, width2, height2);
+
+        channels2 = 3; // RGB로 변환 후 채널은 3으로 설정
+
+    }
+
+ 
+
+    printf("첫 번째 이미지 크기: %dx%d, 채널 수: %d\n", width1, height1, channels1);
+
+    printf("두 번째 이미지 크기: %dx%d, 채널 수: %d\n", width2, height2, channels2);
+
+ 
+
+    // 윈도우 클래스 등록
+
+    WNDCLASS wc = { 0 };
+
+    wc.lpfnWndProc = WindowProc;
+
+    wc.hInstance = GetModuleHandle(NULL);
+
+    wc.lpszClassName = L"ImageViewerClass";
+
+    RegisterClass(&wc);
+
+ 
+
+    // 윈도우 생성
+
+    HWND hwnd = CreateWindowExW(0, L"ImageViewerClass", L"Image Viewer", WS_OVERLAPPEDWINDOW,
+
+        CW_USEDEFAULT, CW_USEDEFAULT, width1 + width2 + 16, max(height1, height2) + 39, NULL, NULL, wc.hInstance, NULL);
+
+    if (!hwnd) {
+
+        MessageBoxW(NULL, L"윈도우 생성 실패!", L"Error", MB_OK);
+
+        stbi_image_free(image_data1);
+
+        stbi_image_free(image_data2);
+
+        return -1;
+
+    }
+
+ 
+
+    // 윈도우 표시
+
+    ShowWindow(hwnd, SW_SHOW);
+
+    UpdateWindow(hwnd);
+
+ 
+
+    // 메시지 루프
+
+    MSG msg;
+
+    while (GetMessage(&msg, NULL, 0, 0)) {
+
+        TranslateMessage(&msg);
+
+        DispatchMessage(&msg);
+
+    }
+
+ 
+
+    // 이미지 메모리 해제
+
+    stbi_image_free(image_data1);
+
+    stbi_image_free(image_data2);
+
+ 
+
+    return 0;
+
+}
+
+ 
+
+LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
+
+    switch (uMsg) {
+
+    case WM_PAINT: {
+
+        PAINTSTRUCT ps;
+
+        HDC hdc = BeginPaint(hwnd, &ps);
+
+ 
+
+        // 첫 번째 이미지 그리기
+
+        BITMAPINFO bmi1 = { 0 };
+
+        bmi1.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+        bmi1.bmiHeader.biWidth = width1;
+
+        bmi1.bmiHeader.biHeight = -height1;
+
+        bmi1.bmiHeader.biPlanes = 1;
+
+        bmi1.bmiHeader.biBitCount = channels1 * 8;
+
+        bmi1.bmiHeader.biCompression = BI_RGB;
+
+ 
+
+        SetDIBitsToDevice(hdc, 0, 0, width1, height1, 0, 0, 0, height1, image_data1, &bmi1, DIB_RGB_COLORS);
+
+ 
+
+        // 두 번째 이미지 그리기
+
+        BITMAPINFO bmi2 = { 0 };
+
+        bmi2.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+
+        bmi2.bmiHeader.biWidth = width2;
+
+        bmi2.bmiHeader.biHeight = -height2;
+
+        bmi2.bmiHeader.biPlanes = 1;
+
+        bmi2.bmiHeader.biBitCount = channels2 * 8;
+
+        bmi2.bmiHeader.biCompression = BI_RGB;
+
+ 
+
+        SetDIBitsToDevice(hdc, width1, 0, width2, height2, 0, 0, 0, height2, image_data2, &bmi2, DIB_RGB_COLORS);
+
+ 
+
+        EndPaint(hwnd, &ps);
+
+        return 0;
+
+    }
+
+    case WM_DESTROY:
+
+        PostQuitMessage(0);
+
+        return 0;
+
+    default:
+
+        return DefWindowProc(hwnd, uMsg, wParam, lParam);
+
+    }
+
+}
